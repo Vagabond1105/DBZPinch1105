@@ -1,4 +1,6 @@
-# HOW TO RUN PROJECT
+# DBZPinch1105 - Dynamic B Z Pinch 1105
+
+### HOW TO RUN PROJECT
 
 1) Clone Repo on Your Device
 2) Create Virtual Environment
