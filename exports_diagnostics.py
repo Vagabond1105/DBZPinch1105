@@ -25,11 +25,13 @@ def energy_graph(
     kinetic_energy_evolution,
     internal_energy_evolution,
     magnetic_energy_evolution,
+    potential_energy_evolution,
 ):
     total_energy_evolution = (
         np.array(kinetic_energy_evolution)
         + np.array(internal_energy_evolution)
         + np.array(magnetic_energy_evolution)
+        + np.array(potential_energy_evolution)
     )
 
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -37,6 +39,7 @@ def energy_graph(
     ax.plot(time_evolution, kinetic_energy_evolution, label="Kinetic")
     ax.plot(time_evolution, internal_energy_evolution, label="Internal")
     ax.plot(time_evolution, magnetic_energy_evolution, label="Magnetic")
+    ax.plot(time_evolution, potential_energy_evolution, label="Potential")
     ax.plot(time_evolution, total_energy_evolution, label="Total", linewidth=2)
 
     ax.set_xlabel("Time")
@@ -178,6 +181,7 @@ def export_diagnostics(sim_state, output_path="diagnostics_export.zip"):
         sim_state.kinetic_energy_history,
         sim_state.internal_energy_history,
         sim_state.magnetic_energy_history,
+        sim_state.potential_energy_history,
     )
     fig_core = core_averages_graph(
         sim_state.time_array,

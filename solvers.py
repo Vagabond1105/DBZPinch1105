@@ -483,15 +483,18 @@ def evolve_simstate(sim_state):
     ke = 0.5 * sim_state.rho * np.sum(v_current * v_current, axis=-1)
     me = 0.5 * sim_state.b2() / mu_0
     ie = sim_state.internal_energy
+    pe = sim_state.potential_energy()
 
     total_ke = float(np.sum(ke))
     total_me = float(np.sum(me))
     total_ie = float(np.sum(ie))
-    total_e = total_ke + total_me + total_ie
+    total_pe = float(np.sum(pe))
+    total_e = total_ke + total_me + total_ie + total_pe
 
     sim_state.kinetic_energy_history.append(total_ke)
     sim_state.magnetic_energy_history.append(total_me)
     sim_state.internal_energy_history.append(total_ie)
+    sim_state.potential_energy_history.append(total_pe)
     sim_state.total_energy_history.append(total_e)
 
     p_now = sim_state.pressure()

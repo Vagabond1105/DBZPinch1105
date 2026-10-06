@@ -120,28 +120,19 @@ class CameraController:
 # runtime data display (top-left, while running)
 # =====================================================
 
-def compute_potential_energy(sim_state):
-    """
-    Gravitational potential energy, computed live rather than tracked as
-    a history array. "potential_energy" is listed in the UI spec's
-    runtime data block, but nothing in simstate.py/solvers.py tracks it -
-    the diagnostics export graphs don't ask for it either, so there was
-    no history list to reuse. For uniform gravity g in -y (see
-    SimState.gravity_vector), potential energy density is rho * g * y;
-    summed the same unweighted way the other energy totals already are
-    in solvers.py (no explicit cell-volume factor - consistent with, not
-    a departure from, the existing convention).
-    """
-    g = sim_state.rt_params.grav.value_rn
-    pe_density = sim_state.rho * g * sim_state.Y
-    return float(np.sum(pe_density))
-
-
 class RuntimeDataDisplay:
     """
     Manages the stack of labeled metrics shown in the top-left corner
     while the sim is running: time elapsed, core averages, confinement/
     Lawson proxies, and the four energy totals (including potential).
+
+    Potential energy used to be computed live here via a standalone
+    compute_potential_energy() helper, because nothing in simstate.py/
+    solvers.py tracked it. That's fixed now - SimState.potential_energy()
+    is a proper derived field and solvers.py appends its total to
+    potential_energy_history every step (see simstate.py/solvers.py),
+    the same as kinetic/magnetic/internal energy. This class just reads
+    that history like it already does for the other three.
     """
 
     def __init__(self, parent, start_position=(20, 20), line_spacing=20):
@@ -187,7 +178,7 @@ class RuntimeDataDisplay:
             "Lawson Proxy": round(last_or_zero(sim_state.lawson_evolution), 4),
             "Confinement Proxy": round(last_or_zero(sim_state.confinement_evolution), 4),
             "Kinetic Energy": round(last_or_zero(sim_state.kinetic_energy_history), 4),
-            "Potential Energy": round(compute_potential_energy(sim_state), 4),
+            "Potential Energy": round(last_or_zero(sim_state.potential_energy_history), 4),
             "Magnetic Energy": round(last_or_zero(sim_state.magnetic_energy_history), 4),
             "Total Energy": round(last_or_zero(sim_state.total_energy_history), 4),
         }
@@ -287,14 +278,15 @@ class Button:
                 center=center,
                 width=self.length,
                 height=self.height,
+                radius=8,
                 color=self._current_colour,
                 parent=self.parent,
             )
             self._text_visual = visuals.Text(
                 self.text,
                 pos=center,
-                color="white",
-                font_size=10,
+                color=(0.95, 0.95, 0.95, 1.0),
+                font_size=11,
                 parent=self.parent,
             )
         else:
@@ -393,16 +385,26 @@ class ParameterSlider:
                 self._label_visual.parent = None
             return
 
+        # LEGIBILITY REWORK: the original spec called for literal
+        # black-bg/white-outline (init) vs white-bg/black-outline (rt).
+        # In practice that's a harsh, high-contrast flat block either way,
+        # and on a black canvas the "black bg" side risks nearly
+        # disappearing except for its outline. Kept the same idea -
+        # visually distinguish init vs rt - but via a shared calm dark
+        # track with a colour-coded accent (cool blue for init, warm
+        # amber for rt) instead of a stark colour inversion. Using
+        # explicit RGBA tuples throughout rather than colour-name strings.
+        track_fill = (0.12, 0.12, 0.16, 0.95)
         if self.colour_type == 0:
-            bg_colour, outline_colour = "black", "white"
+            accent = (0.35, 0.75, 1.0, 1.0)   # init - cool blue
         else:
-            bg_colour, outline_colour = "white", "black"
+            accent = (1.0, 0.65, 0.25, 1.0)   # rt - warm amber
 
         x, y = self.position
         track_center = (x + self.length / 2.0, y + self.height / 2.0)
         knob_x = self._value_to_knob_x()
         knob_center = (knob_x, y + self.height / 2.0)
-        label_pos = (x, y - 14)
+        label_pos = (x, y - 18)
         label_text = f"{self.name}: {round(self.value, 3)}"
 
         if self._track_visual is None:
@@ -410,22 +412,23 @@ class ParameterSlider:
                 center=track_center,
                 width=self.length,
                 height=self.height,
-                color=bg_colour,
-                border_color=outline_colour,
-                border_width=2,
+                radius=self.height / 4.0,
+                color=track_fill,
+                border_color=accent,
+                border_width=1.5,
                 parent=self.parent,
             )
             self._knob_visual = visuals.Ellipse(
                 center=knob_center,
-                radius=self.height / 2.0,
-                color=outline_colour,
+                radius=self.height / 2.0 - 3.0,
+                color=accent,
                 parent=self.parent,
             )
             self._label_visual = visuals.Text(
                 label_text,
                 pos=label_pos,
-                color="white",
-                font_size=9,
+                color=(0.9, 0.9, 0.9, 1.0),
+                font_size=11,
                 anchor_x="left",
                 anchor_y="bottom",
                 parent=self.parent,
@@ -462,13 +465,16 @@ class TutorialBox:
     HEIGHT = 400
 
     DEFAULT_TEXT = (
-        "DBZPinch1105 - Z-Pinch MHD Simulator\n\n"
+        "DBZPinch1105\n"
+        "Z-Pinch MHD Simulator\n\n"
         "Controls:\n"
-        "  Arrow keys / WASD - orbit camera\n"
-        "  +/- - zoom camera in/out\n"
-        "  Drag sliders - adjust parameters\n\n"
-        "Adjust the Init sliders (left) before starting, then press "
-        "START.\nRuntime sliders (right) can be changed at any time."
+        "  Arrows / WASD - orbit camera\n"
+        "  +/- - zoom in/out\n"
+        "  Drag sliders to adjust\n\n"
+        "Set Init sliders (left),\n"
+        "then press START.\n"
+        "Runtime sliders (right)\n"
+        "can be changed any time."
     )
 
     def __init__(self, position, parent=None):
@@ -489,8 +495,8 @@ class TutorialBox:
             self._text_visual = visuals.Text(
                 self.text,
                 pos=self.position,
-                color="white",
-                font_size=9,
+                color=(0.9, 0.9, 0.9, 1.0),
+                font_size=11,
                 anchor_x="left",
                 anchor_y="top",
                 parent=self.parent,

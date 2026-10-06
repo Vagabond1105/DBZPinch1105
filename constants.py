@@ -109,20 +109,11 @@ cam_radius_default = 500.0
 # 500); min/max are a provisional +/-400 window around that, not derived
 # from anything - revisit once the grid is actually being rendered and
 # you know what range feels right.
-
-# =====================================================
-# camera (ui_ux.py CameraController)
-# =====================================================
-
-cam_r_min = 50.0
-cam_r_max = 2000.0
-cam_r_def = 500.0
-# NEW (added for ui_ux.py) - PROVISIONAL orbital-camera distance bounds
-# and default. cam_r_def ~ 500 comfortably fits the full 240x240x400
-# grid in view (box diagonal is ~525 at default cell_length=1), matching
-# the distance already used in visualisation.py.md's VisPy reference.
-# NOTE: CameraController may end up unused - see ui_ux.py's own note on
-# the conflict with VisPy's built-in TurntableCamera.
+#
+# (A second, differently-numbered cam_r_min/max/def block used to live
+# here too - dead code nobody imported, left over from an earlier draft.
+# Removed rather than fixed, since only the block above is actually
+# used by ui_ux.py's CameraController.)
 
 # =====================================================
 # numerical safety floors

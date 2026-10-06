@@ -177,6 +177,7 @@ class SimState:
         self.kinetic_energy_history = []
         self.magnetic_energy_history = []
         self.internal_energy_history = []
+        self.potential_energy_history = []
         self.total_energy_history = []
 
         self.core_density_evolution = []
@@ -223,6 +224,27 @@ class SimState:
     def alfven_speed(self):
         rho_safe = np.maximum(self.rho, rho_min)
         return np.sqrt(self.b2() / (rho_safe * mu_0))
+
+    def potential_energy(self):
+        """
+        Gravitational potential energy DENSITY, PE = rho * g * y, for
+        uniform gravity g in -y (see gravity_vector). Returns the field,
+        not a summed total - matching pressure()/temperature()/b2() above,
+        and matching how kinetic/magnetic energy densities are computed
+        inline in solvers.py before being summed there.
+
+        Previously this was computed ad hoc inside ui_ux.py for the
+        runtime display only, and solvers.py's total_energy_history never
+        included it. That meant any nonzero grav made total energy look
+        like it was leaking (PE converting to/from KE) in both the
+        runtime display and the exported energy graph, when the system
+        was actually conserving energy fine - a false alarm for exactly
+        the check the 32^3 validation grid exists to run. Now there's one
+        source of truth that solvers.py, ui_ux.py, and
+        exports_diagnostics.py all read from.
+        """
+        g = self.rt_params.grav.value_rn
+        return self.rho * g * self.Y
 
     def gravity_vector(self):
         # gravity acts in the negative y direction per Sim_Architecture.md

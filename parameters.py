@@ -103,9 +103,12 @@ class RTParams:
         self.temp_ext = Parameter(0.0, 0.0, 1.0, "rt", float)
         self.pressure_ext = Parameter(0.0, 0.0, 1.0, "rt", float)
 
-        # NOTE: architecture doc says "0 to 100", reference code uses a
-        # min of 1.0. Kept min=1.0 here to match the working reference;
-        # flag if you actually want gravity to be fully disableable (min=0).
+        # NOTE: architecture doc says "0 to 100". An earlier draft had
+        # min=1.0 to match a working reference, but that's inconsistent
+        # with default=0.0 (a default below the parameter's own minimum
+        # would be a latent bug) - kept min=0.0 so gravity is fully
+        # disableable via the slider, which seems like the more useful
+        # sandbox default. Flag if you actually want a hard floor at 1.0.
         self.grav = Parameter(0.0, 0.0, 100.0, "rt", float)
 
         self.resistivity = Parameter(0.01, 0.001, 0.25, "rt", float)

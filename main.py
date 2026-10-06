@@ -80,6 +80,12 @@ class Application:
         self.canvas = self.visualiser.canvas
 
         self.camera_controller = CameraController()
+        # apply the controller's own defaults immediately - otherwise
+        # apply_camera_controller() is only ever called from _ui_tick on
+        # an actual keypress, so theta_def/phi_def/r_def would sit unused
+        # and VisPy's TurntableCamera would just show its own defaults
+        # until the user's first arrow-key/WASD press.
+        self.visualiser.apply_camera_controller(self.camera_controller)
 
         self.input_state = {
             "mouse_pos": (0, 0),
@@ -100,8 +106,12 @@ class Application:
         # cooperative loop could starve the UI timer and input events
         # entirely by never yielding. 1ms still runs physics far faster
         # than 60Hz whenever the CFL dt allows it, without locking out
-        # everything else.
-        self.physics_timer = app.Timer(interval=0.001, connect=self._physics_tick, start=True)
+        # everything else. Starts stopped - _apply comes from
+        # _on_main_button_click/_on_restart_click actually starting/
+        # stopping it at sim_status transitions, rather than leaving it
+        # always-on and relying only on the internal status check in
+        # _physics_tick (that check stays too, as a safety net).
+        self.physics_timer = app.Timer(interval=0.001, connect=self._physics_tick, start=False)
 
     # =====================================================
     # ui construction
@@ -120,9 +130,9 @@ class Application:
         # camera instead of staying fixed on screen, this is where to
         # look first.
         left_x = 40
-        right_x = canvas_w - 40 - ParameterSlider.LENGTH
-        start_y = 150
-        spacing = 60
+        right_x = canvas_w - 60 - ParameterSlider.LENGTH
+        start_y = 160
+        spacing = 85
 
         init_specs = [
             ("n_particles", self.init_params.n_particles),
@@ -154,7 +164,7 @@ class Application:
             self.rt_sliders.append(slider)
 
         # ---- tutorial box (bottom-right, init only) ----
-        tutorial_pos = (canvas_w - 440, canvas_h - 440)
+        tutorial_pos = (canvas_w - 460, canvas_h - 440)
         self.tutorial_box = TutorialBox(position=tutorial_pos, parent=self.canvas.scene)
 
         # ---- runtime data display (top-left, while running/paused) ----
@@ -241,6 +251,18 @@ class Application:
             slider.interact_mouse(mouse_pos, mouse_down)
             slider.render_slider()
 
+        # iso-level slider lives on the visualiser (see visualisation.py's
+        # IsoLevelSlider) - it's not a ParameterSlider, so it's driven
+        # here explicitly rather than folding it into the loop above.
+        self.visualiser.slider.interact_mouse(mouse_pos, mouse_down)
+        self.visualiser.slider.render()
+
+        any_dragging = any(
+            getattr(s, "_dragging", False) 
+            for s in self.init_sliders + self.rt_sliders + [self.visualiser.slider]
+        )
+        self.visualiser.view.camera.interactive = not any_dragging
+
         # buttons
         if self.main_button.detect_interaction(mouse_pos, mouse_down):
             self._on_main_button_click()
@@ -288,16 +310,19 @@ class Application:
             self.main_button.text = "PAUSE"
             self.restart_button.display = True
             self.restart_default_button.display = True
+            self.physics_timer.start()
 
         elif status == "run":
             self.sim_state.sim_status = "pause"
             self.main_button.text = "RESUME"
             self.export_button.display = True
+            self.physics_timer.stop()
 
         elif status == "pause":
             self.sim_state.sim_status = "run"
             self.main_button.text = "PAUSE"
             self.export_button.display = False
+            self.physics_timer.start()
 
     def _on_restart_click(self, keep_current_values):
         """
@@ -315,6 +340,8 @@ class Application:
 
         self.sim_state = SimState(self.init_params, self.rt_params)
         self.visualiser.sim_state = self.sim_state
+        self.visualiser.mark_dirty()
+        self.physics_timer.stop()
 
         for slider in self.init_sliders + self.rt_sliders:
             slider.value = slider.parameter.value_rn
@@ -367,3 +394,6 @@ class Application:
 
 if __name__ == "__main__":
     Application().run()
+
+
+# BUGS: CAMERA MOVES WHILE MOVING SLIDERS
